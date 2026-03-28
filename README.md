@@ -1,3 +1,10 @@
+title: OpenEnv Cloud Resource Manager
+emoji: ☁️
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+
 # OpenEnv Cloud Resource Manager
 
 A simulation environment where an LLM agent manages a fleet of Virtual Machines, balancing performance against cost.
