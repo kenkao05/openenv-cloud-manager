@@ -18,6 +18,9 @@ dependencies = [
     "numpy",
 ]
 
+[project.scripts]
+server = "server.app:main"
+
 [project.optional-dependencies]
 dev = ["pytest", "httpx"]
 
