@@ -41,9 +41,7 @@ def get_action(obs: dict) -> int:
 
 
 def run_task(task_id: str):
-    print(f"\n{'='*40}")
-    print(f"Running task: {task_id}")
-    print('='*40)
+    print(f"[START] task={task_id}", flush=True)
 
     obs = requests.post(f"{ENV_BASE}/reset").json()
     action_history = []
@@ -61,12 +59,12 @@ def run_task(task_id: str):
         action_history.append(action)
         latency_history.append(obs["current_latency_ms"])
 
-        print(f"Step {step:02d} | action={action} | latency={obs['current_latency_ms']}ms | reward={reward:+.2f}")
+        print(f"[STEP] step={step+1} action={action} latency={obs['current_latency_ms']} reward={reward:.4f}", flush=True)
         step += 1
-        time.sleep(0.5)  # avoid hitting Gemini rate limits
+        time.sleep(0.5)  # avoid hitting rate limits
 
     final_state = requests.get(f"{ENV_BASE}/state").json()
-    print(f"Final accumulated cost: ${final_state['accumulated_cost']}")
+    print(f"Final accumulated cost: ${final_state['accumulated_cost']}", flush=True)
     return action_history, latency_history, final_state["accumulated_cost"]
 
 
@@ -75,16 +73,16 @@ if __name__ == "__main__":
 
     ah, lh, cost = run_task("scale-up-basic")
     score1 = grade_scale_up_basic(ah)
-    print(f"[scale-up-basic] Score: {score1}")
+    print(f"[END] task=scale-up-basic score={score1:.4f} steps={len(ah)}", flush=True)
 
     ah, lh, cost = run_task("latency-control")
     score2 = grade_latency_control(lh)
-    print(f"[latency-control] Score: {score2}")
+    print(f"[END] task=latency-control score={score2:.4f} steps={len(ah)}", flush=True)
 
     ah, lh, cost = run_task("cost-optimization-heavy")
     score3 = grade_cost_optimization(lh, cost)
-    print(f"[cost-optimization-heavy] Score: {score3}")
+    print(f"[END] task=cost-optimization-heavy score={score3:.4f} steps={len(ah)}", flush=True)
 
-    print(f"\nAll scores: {score1}, {score2}, {score3}")
+    print(f"\nAll scores: {score1}, {score2}, {score3}", flush=True)
     assert all(0.0 <= s <= 1.0 for s in [score1, score2, score3]), "Score out of range!"
-    print("All scores valid (0.0–1.0). Ready to submit.")
+    print("All scores valid (0.0–1.0). Ready to submit.", flush=True)
