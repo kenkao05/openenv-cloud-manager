@@ -39,6 +39,11 @@ def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
     print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 
+def clamp_score(score: float, eps: float = 1e-6) -> float:
+    """Clamp score to strictly open interval (0, 1) as required by OpenEnv."""
+    return max(eps, min(1.0 - eps, float(score)))
+
+
 def get_action(obs: dict) -> int:
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -97,18 +102,17 @@ if __name__ == "__main__":
     from tasks import grade_scale_up_basic, grade_latency_control, grade_cost_optimization
 
     ah, rewards1, cost = run_task("scale-up-basic")
-    score1 = grade_scale_up_basic(ah)
+    score1 = clamp_score(grade_scale_up_basic(ah))
     log_end(success=score1 > 0, steps=len(ah), score=score1, rewards=rewards1)
 
     ah, rewards2, cost = run_task("latency-control")
-    lh = [obs for obs in rewards2]  # latency tracked via rewards list
-    score2 = grade_latency_control([])
+    score2 = clamp_score(grade_latency_control(ah))
     log_end(success=score2 > 0, steps=len(ah), score=score2, rewards=rewards2)
 
     ah, rewards3, cost = run_task("cost-optimization-heavy")
-    score3 = grade_cost_optimization([], cost)
+    score3 = clamp_score(grade_cost_optimization(ah, cost))
     log_end(success=score3 > 0, steps=len(ah), score=score3, rewards=rewards3)
 
     print(f"\nAll scores: {score1}, {score2}, {score3}", flush=True)
-    assert all(0.0 <= s <= 1.0 for s in [score1, score2, score3]), "Score out of range!"
-    print("All scores valid (0.0–1.0). Ready to submit.", flush=True)
+    assert all(0.0 < s < 1.0 for s in [score1, score2, score3]), "Score out of range!"
+    print("All scores valid (0.0, 1.0) exclusive. Ready to submit.", flush=True)
