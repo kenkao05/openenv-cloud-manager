@@ -6,16 +6,28 @@ app = FastAPI()
 
 class CloudEnv:
     def __init__(self):
+        self.task_id = "scale-up-basic"
         self.reset()
 
-    def reset(self):
-        self.vms = 2
+    def reset(self, task_id: str = "scale-up-basic"):
+        self.task_id = task_id
+        self.vms = 1 if task_id == "scale-up-basic" else 2
         self.cost = 0.0
         self.steps = 0
+        self.latency_history = []
         return self._get_obs()
 
     def _get_obs(self):
-        requests = random.randint(100, 1000)
+        if self.task_id == "scale-up-basic":
+            # Guaranteed overload: 1 VM, high requests
+            requests = random.randint(800, 1000)
+        elif self.task_id == "cost-optimization-heavy":
+            # Black Friday: sustained high traffic
+            requests = random.randint(700, 1000)
+        else:
+            # latency-control: fluctuating traffic
+            requests = random.randint(100, 1000)
+
         cpu = min(100, (requests / (self.vms * 200)) * 100)
         latency = 20 + (cpu ** 2 / 100)
         return {
@@ -35,6 +47,7 @@ class CloudEnv:
         self.cost += (self.vms * 0.05)
         self.steps += 1
         obs = self._get_obs()
+        self.latency_history.append(obs["current_latency_ms"])
 
         reward = 1.0
         if obs["current_latency_ms"] > 200: reward -= 0.5
@@ -48,7 +61,8 @@ class CloudEnv:
         return {
             "step_count": self.steps,
             "vms_active": self.vms,
-            "accumulated_cost": round(self.cost, 2)
+            "accumulated_cost": round(self.cost, 2),
+            "latency_history": self.latency_history
         }
 
 
@@ -60,8 +74,8 @@ def health():
     return {"status": "ok"}
 
 @app.post("/reset")
-def reset():
-    obs = env.reset()
+def reset(task_id: str = "scale-up-basic"):
+    obs = env.reset(task_id=task_id)
     return CloudObservation(**obs)
 
 @app.post("/step")

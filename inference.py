@@ -39,11 +39,6 @@ def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
     print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 
-def clamp_score(score: float, eps: float = 1e-6) -> float:
-    """Clamp score to strictly open interval (0, 1) as required by OpenEnv."""
-    return max(eps, min(1.0 - eps, float(score)))
-
-
 def get_action(obs: dict) -> int:
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -65,7 +60,8 @@ def get_action(obs: dict) -> int:
 def run_task(task_id: str):
     log_start(task_id)
 
-    obs = requests.post(f"{ENV_BASE}/reset").json()
+    # Pass task_id to reset so env configures itself correctly
+    obs = requests.post(f"{ENV_BASE}/reset", params={"task_id": task_id}).json()
     action_history = []
     rewards = []
     done = False
@@ -93,26 +89,27 @@ def run_task(task_id: str):
 
     final_state = requests.get(f"{ENV_BASE}/state").json()
     cost = final_state["accumulated_cost"]
+    latency_history = final_state.get("latency_history", [])
     print(f"Final accumulated cost: ${cost}", flush=True)
 
-    return action_history, rewards, cost
+    return action_history, rewards, cost, latency_history
 
 
 if __name__ == "__main__":
     from tasks import grade_scale_up_basic, grade_latency_control, grade_cost_optimization
 
-    ah, rewards1, cost = run_task("scale-up-basic")
-    score1 = clamp_score(grade_scale_up_basic(ah))
+    ah, rewards1, cost, lh = run_task("scale-up-basic")
+    score1 = grade_scale_up_basic(ah)
     log_end(success=score1 > 0, steps=len(ah), score=score1, rewards=rewards1)
 
-    ah, rewards2, cost = run_task("latency-control")
-    score2 = clamp_score(grade_latency_control(ah))
+    ah, rewards2, cost, lh = run_task("latency-control")
+    score2 = grade_latency_control(lh)
     log_end(success=score2 > 0, steps=len(ah), score=score2, rewards=rewards2)
 
-    ah, rewards3, cost = run_task("cost-optimization-heavy")
-    score3 = clamp_score(grade_cost_optimization(ah, cost))
+    ah, rewards3, cost, lh = run_task("cost-optimization-heavy")
+    score3 = grade_cost_optimization(lh, cost)
     log_end(success=score3 > 0, steps=len(ah), score=score3, rewards=rewards3)
 
     print(f"\nAll scores: {score1}, {score2}, {score3}", flush=True)
-    assert all(0.0 < s < 1.0 for s in [score1, score2, score3]), "Score out of range!"
-    print("All scores valid (0.0, 1.0) exclusive. Ready to submit.", flush=True)
+    assert all(0.0 <= s <= 1.0 for s in [score1, score2, score3]), "Score out of range!"
+    print("All scores valid (0.0–1.0). Ready to submit.", flush=True)

@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import List
 
 class CloudObservation(BaseModel):
     num_vms: int
@@ -15,3 +16,4 @@ class CloudState(BaseModel):
     step_count: int
     vms_active: int
     accumulated_cost: float
+    latency_history: List[float] = []
