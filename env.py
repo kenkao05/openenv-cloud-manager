@@ -4,6 +4,14 @@ from models import CloudObservation, CloudAction, CloudState
 
 app = FastAPI()
 
+_EPS = 1e-6
+
+
+def _clamp(score: float) -> float:
+    """Clamp to strictly open interval (0, 1) as required by OpenEnv validator."""
+    return max(_EPS, min(1.0 - _EPS, float(score)))
+
+
 class CloudEnv:
     def __init__(self):
         self.task_id = "scale-up-basic"
@@ -19,13 +27,10 @@ class CloudEnv:
 
     def _get_obs(self):
         if self.task_id == "scale-up-basic":
-            # Guaranteed overload: 1 VM, high requests
             requests = random.randint(800, 1000)
         elif self.task_id == "cost-optimization-heavy":
-            # Black Friday: sustained high traffic
             requests = random.randint(700, 1000)
         else:
-            # latency-control: fluctuating traffic
             requests = random.randint(100, 1000)
 
         cpu = min(100, (requests / (self.vms * 200)) * 100)
@@ -50,12 +55,17 @@ class CloudEnv:
         self.latency_history.append(obs["current_latency_ms"])
 
         reward = 1.0
-        if obs["current_latency_ms"] > 200: reward -= 0.5
-        if obs["avg_cpu_percent"] > 95:     reward -= 0.3
+        if obs["current_latency_ms"] > 200:
+            reward -= 0.5
+        if obs["avg_cpu_percent"] > 95:
+            reward -= 0.3
         reward -= (self.vms * 0.1)
 
+        # Clamp reward to strictly open interval (0, 1) — OpenEnv requirement
+        reward = _clamp(round(reward, 4))
+
         done = self.steps >= 24
-        return obs, round(reward, 4), done
+        return obs, reward, done
 
     def state(self):
         return {
